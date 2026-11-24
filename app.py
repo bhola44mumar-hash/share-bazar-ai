@@ -6,10 +6,11 @@ import io
 from PIL import Image
 from gtts import gTTS
 from google import genai
+from google.genai import types
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
 
-st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:12px;border-radius:12px;text-align:center;"><h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2><p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
 
 saved_key = ""
 try:
@@ -79,9 +80,7 @@ if "wallet" not in st.session_state:
 if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे सवाल लिखें या चार्ट की फोटो डालकर **'🚀 AI को भेजें (जवाब पाएं)'** बटन दबाएं!"}
-    ]
+    st.session_state.messages = []
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -119,10 +118,10 @@ with tab2:
         c1.metric("ताज़ा भाव", f"₹{curr_price}", f"{diff}")
         c2.metric("AI ट्रेंड", trend)
         c3.metric("RSI (ताकत)", f"{rsi_val}", "Overbought >70 | Oversold <30")
-        st.write(f"🛡️ **मजबूत Support (सहारा):** ₹{support} &nbsp;|&nbsp; 🚧 **Resistance (रुकावट):** ₹{resistance}")
+        st.write(f"🛡️ **मजबूत Support:** ₹{support} &nbsp;|&nbsp; 🚧 **Resistance:** ₹{resistance}")
         st.line_chart(hist_data['Close'].tail(50))
     else:
-        st.warning("डेटा लोड नहीं हो सका, कृपया इंटरनेट जांचें या दूसरा शेयर चुनें।")
+        st.warning("डेटा लोड नहीं हो सका।")
 
     st.divider()
     if st.button("🔎 आज के टॉप 8 शेयरों का तेज़ स्कैन करें"):
@@ -144,13 +143,13 @@ with tab2:
                 st.dataframe(pd.DataFrame(scan_rows), use_container_width=True)
 
 with tab3:
-    st.subheader("💼 आपका वर्चुअल ट्रेडिंग खाता (बिना असली पैसे के प्रैक्टिस)")
-    st.metric("उपलब्ध प्रैक्टिस बैलेंस", f"₹{round(st.session_state.wallet, 2)}")
+    st.subheader("💼 वर्चुअल ट्रेडिंग खाता (प्रैक्टिस)")
+    st.metric("उपलब्ध बैलेंस", f"₹{round(st.session_state.wallet, 2)}")
     if curr_price > 0:
         col_q, col_t, col_s = st.columns(3)
-        qty = col_q.number_input("मात्रा (Shares):", min_value=1, max_value=1000, value=10)
-        target_pts = col_t.number_input("Target मुनाफा (₹/शेयर):", min_value=1.0, value=5.0)
-        sl_pts = col_s.number_input("Stop-Loss नुकसान (₹/शेयर):", min_value=1.0, value=3.0)
+        qty = col_q.number_input("मात्रा:", min_value=1, max_value=1000, value=10)
+        target_pts = col_t.number_input("Target (₹/शेयर):", min_value=1.0, value=5.0)
+        sl_pts = col_s.number_input("Stop-Loss (₹/शेयर):", min_value=1.0, value=3.0)
         b1, b2 = st.columns(2)
         if b1.button("🟢 खरीदें (Paper Buy)", use_container_width=True):
             cost = curr_price * qty
@@ -162,24 +161,24 @@ with tab3:
                 }
                 st.success(f"✅ {selected_share} के {qty} शेयर ₹{curr_price} पर खरीदे गए!")
             else:
-                st.error("वर्चुअल बैलेंस कम है!")
+                st.error("बैलेंस कम है!")
         if selected_share in st.session_state.positions:
             pos = st.session_state.positions[selected_share]
             live_pnl = round((curr_price - pos["buy_price"]) * pos["qty"], 2)
-            st.info(f"📌 चलता हुआ सौदा: {pos['qty']} शेयर @ ₹{pos['buy_price']} | लाइव मुनाफा/नुकसान: **₹{live_pnl}**")
+            st.info(f"📌 चलता हुआ सौदा: {pos['qty']} शेयर @ ₹{pos['buy_price']} | मुनाफा/नुकसान: **₹{live_pnl}**")
             if curr_price >= pos["target"]:
                 st.session_state.wallet += curr_price * pos["qty"]
                 del st.session_state.positions[selected_share]
                 st.balloons()
-                st.success(f"🎉 Target पूरा! ₹{live_pnl} मुनाफे पर अपने आप बिक गया!")
+                st.success(f"🎉 Target पूरा! ₹{live_pnl} मुनाफे पर बिक गया!")
             elif curr_price <= pos["sl"]:
                 st.session_state.wallet += curr_price * pos["qty"]
                 del st.session_state.positions[selected_share]
-                st.warning(f"🛑 Stop-Loss हिट! ₹{live_pnl} नुकसान पर सौदा अपने आप कट गया।")
+                st.warning(f"🛑 Stop-Loss हिट! ₹{live_pnl} नुकसान पर कट गया।")
             if b2.button("🔴 अभी बेचें (Paper Sell)", use_container_width=True):
                 st.session_state.wallet += curr_price * pos["qty"]
                 del st.session_state.positions[selected_share]
-                st.success(f"सौदा बंद किया गया। कुल मुनाफा/नुकसान: ₹{live_pnl}")
+                st.success(f"सौदा बंद। कुल मुनाफा/नुकसान: ₹{live_pnl}")
 
 def text_to_speech_hindi(text):
     try:
@@ -193,12 +192,18 @@ def text_to_speech_hindi(text):
         return None
 
 with tab1:
-    if curr_price > 0:
-        st.caption(f"📡 लाइव संदर्भ: {live_context}")
-
-    # सवाल और चार्ट फोटो दोनों एक ही बॉक्स में
     with st.form(key="ask_form"):
         prompt = st.text_input("✍️ यहाँ अपना सवाल लिखें:", placeholder="जैसे: इस शेयर या चार्ट में क्या करें?")
         uploaded_chart = st.file_uploader("📸 चार्ट की फोटो चुनें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
         submit_btn = st.form_submit_button("🚀 AI को भेजें (जवाब पाएं)", use_container_width=True)
 
+    SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
+
+    if submit_btn:
+        user_q = prompt.strip()
+        if not user_q and not uploaded_chart:
+            st.warning("⚠️ कृपया पहले सवाल लिखें या चार्ट की फोटो चुनें, फिर बटन दबाएं।")
+        else:
+            if not user_q and uploaded_chart:
+                user_q = "इस अपलोड किए गए चार्ट की फोटो को देखकर पूरा विश्लेषण करें और बताएं कि ट्रेंड, सपोर्ट और रेजिस्टेंस क्या है।"
+            
