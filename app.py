@@ -86,7 +86,7 @@ def get_stock_summary(ticker, share_name):
 
 ALL_SHARES = load_nifty_500()
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **सुपर-फास्ट शेयर बाजार AI** हूँ। अब कोई `503` एरर नहीं आएगा—सवाल लिखें या चार्ट अपलोड करें!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **सुपर-फास्ट शेयर बाजार AI** हूँ। अब कोई रुकावट नहीं आएगी—सवाल लिखें या चार्ट अपलोड करें!"}]
 
 selected_share = st.selectbox("🔍 शेयर चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -118,12 +118,16 @@ def speak_hindi(text):
 
 def ask_groq_fast(key, prompt_text, pil_image=None):
     url = "https://groq.com"
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     if pil_image is not None:
         buf = io.BytesIO()
         pil_image.save(buf, format="JPEG", quality=80)
         b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
-        model = "meta-llama/llama-4-scout-17b-16e-instruct"
+        models_to_try = ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.2-90b-vision-preview", "llama-3.2-11b-vision-preview"]
         messages = [{
             "role": "user",
             "content": [
@@ -132,14 +136,17 @@ def ask_groq_fast(key, prompt_text, pil_image=None):
             ]
         }]
     else:
-        model = "llama-3.3-70b-versatile"
+        models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
         messages = [{"role": "user", "content": prompt_text}]
         
-    payload = {"model": model, "messages": messages, "temperature": 0.4, "max_tokens": 1024}
-    r = requests.post(url, headers=headers, json=payload, timeout=20)
-    if r.status_code == 200:
-        return r.json()["choices"]["message"]["content"]
-    raise Exception(f"Groq {r.status_code}: {r.text}")
+    last_err = ""
+    for m in models_to_try:
+        payload = {"model": m, "messages": messages, "temperature": 0.4, "max_tokens": 1024}
+        r = requests.post(url, headers=headers, json=payload, timeout=20)
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"]
+        last_err = f"{m} ({r.status_code}): {r.text}"
+    raise Exception(last_err)
 
 SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार, Intraday और F&O के सर्वोच्च विशेषज्ञ। यदि चार्ट की फोटो भेजी गई है, तो पैटर्न, सपोर्ट, रेजिस्टेंस और ट्रेंड का गहरा विश्लेषण करो। सरल हिंदी में सटीक जवाब दो और Stop-Loss जरूर बताओ।"
 
@@ -161,14 +168,12 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
                 reply = None
                 err_log = ""
                 
-                # नंबर 1: पहले सुपर-फास्ट Groq से तुरंत जवाब लाएं (ताकि कभी 503 न आए)
                 if groq_key:
                     try:
                         reply = ask_groq_fast(groq_key, full_q, chart_pil)
                     except Exception as e:
                         err_log += f"Groq: {e} | "
                 
-                # नंबर 2: बैकअप में Gemini
                 if not reply and gemini_key:
                     try:
                         client = genai.Client(api_key=gemini_key)
