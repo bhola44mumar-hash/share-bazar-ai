@@ -9,7 +9,7 @@ from gtts import gTTS
 from google import genai
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
-st.markdown('<div style="background:#1e3d59;padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Auto-Smart)</h3></div>', unsafe_allow_html=True)
+st.markdown('<div style="background:#1e3d59;padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
 
 saved_key = ""
 try:
@@ -81,28 +81,6 @@ def get_stock_summary(ticker, share_name):
         pass
     return ""
 
-# आपके अकाउंट के लिए उपलब्ध सभी सक्रिय Gemini मॉडलों की ऑटो-खोज
-@st.cache_data(ttl=3600)
-def get_available_models(key):
-    found = []
-    try:
-        c = genai.Client(api_key=key)
-        for m in c.models.list():
-            name = getattr(m, "name", "")
-            if "gemini" in name.lower() and "embedding" not in name.lower() and "imagen" not in name.lower():
-                clean_name = name.replace("models/", "")
-                found.append(clean_name)
-    except Exception:
-        pass
-    # प्राथमिकता क्रम में मॉडलों को सजाएं
-    priority = [m for m in found if "lite" in m or "flash" in m] + [m for m in found if "pro" in m]
-    backup = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-hydrogen", "gemini-2.5-flash"]
-    final_list = []
-    for item in (priority + found + backup):
-        if item not in final_list:
-            final_list.append(item)
-    return final_list[:6]
-
 ALL_SHARES = load_nifty_500()
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। नीचे सवाल लिखें या चार्ट की फोटो अपलोड करें!"}]
@@ -146,7 +124,7 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
         if not api_key:
             reply = "⚠️ कृपया पहले बाईं तरफ अपनी **Gemini API Key** डालें!"
         else:
-            with st.spinner("सबसे तेज़ खाली AI मॉडल खोजकर सोच रहा हूँ..."):
+            with st.spinner("सोच रहा हूँ..."):
                 client = genai.Client(api_key=api_key)
                 if chart_pil is not None:
                     full_q = f"{SYSTEM_PROMPT}\n\nयूज़र ने चार्ट की फोटो भेजी है और पूछा है: {prompt}\nफोटो देखकर विस्तार से बताएं।"
@@ -155,19 +133,18 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
                     full_q = f"{SYSTEM_PROMPT}\n\nसंदर्भ: {live_context}\n\nसवाल: {prompt}"
                     contents = [full_q]
                 
-                models_to_try = get_available_models(api_key)
                 reply = None
                 err_msg = ""
-                for m in models_to_try:
+                for m in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
                     try:
                         res = client.models.generate_content(model=m, contents=contents)
                         reply = res.text
                         break
                     except Exception as e:
                         err_msg = str(e)
-                        time.sleep(0.8)
+                        time.sleep(2)
                 if not reply:
-                    reply = f"❌ अभी सभी सर्वर व्यस्त हैं, कृपया 10 सेकंड बाद फिर प्रयास करें। ({err_msg})"
+                    reply = f"❌ Google सर्वर अभी व्यस्त है या आपकी दैनिक फ्री लिमिट पूरी हो गई है। कृपया 1 मिनट बाद प्रयास करें। ({err_msg})"
         
         st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
