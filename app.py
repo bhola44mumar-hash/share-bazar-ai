@@ -3,9 +3,10 @@ import yfinance as yf
 import pandas as pd
 import requests
 import io
+import time
+from PIL import Image
 from gtts import gTTS
 from google import genai
-from google.genai import types
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
 st.markdown('<div style="background:#1e3d59;padding:12px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
@@ -68,7 +69,7 @@ def load_nifty_500():
 
 ALL_SHARES = load_nifty_500()
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। नीचे सवाल लिखें और **Enter** दबाएं!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। ऊपर चार्ट की फोटो चुनें या नीचे सवाल लिखकर **Enter** दबाएं!"}]
 
 selected_share = st.selectbox("🔍 शेयर चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -87,7 +88,11 @@ try:
 except Exception:
     pass
 
-uploaded_chart = st.file_uploader("📸 चार्ट की फोटो अपलोड करें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
+uploaded_chart = st.file_uploader("📸 चार्ट की फोटो अपलोड करें (फिर नीचे सवाल लिखें):", type=["png", "jpg", "jpeg"])
+chart_pil = None
+if uploaded_chart is not None:
+    chart_pil = Image.open(uploaded_chart)
+    st.image(chart_pil, caption="✅ यह चार्ट तैयार है — अब नीचे सवाल लिखें", width=250)
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
@@ -104,7 +109,7 @@ def speak_hindi(text):
     except Exception:
         return None
 
-SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार, Intraday और F&O के विशेषज्ञ। यूज़र की टूटी-फूटी हिंदी या Hinglish को समझकर सरल हिंदी में जवाब दो और Stop-Loss का महत्व जरूर बताओ।"
+SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार, Intraday और F&O के सर्वोच्च विशेषज्ञ। यदि यूज़र ने चार्ट की फोटो भेजी है, तो सबसे पहले उस फोटो में दिख रहे चार्ट पैटर्न, कैंडल्स, सपोर्ट, रेजिस्टेंस और ट्रेंड का गहराई से विश्लेषण करो। सरल हिंदी में जवाब दो और Stop-Loss जरूर बताओ।"
 
 if prompt := st.chat_input("यहाँ अपना सवाल लिखें और Enter दबाएं..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -115,24 +120,30 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
         if not api_key:
             reply = "⚠️ कृपया पहले बाईं तरफ अपनी **Gemini API Key** डालें!"
         else:
-            with st.spinner("1000+ ट्रेडर्स के ज्ञान से सोच रहा हूँ..."):
+            with st.spinner("चार्ट और बाजार का गहरा विश्लेषण कर रहा हूँ..."):
                 client = genai.Client(api_key=api_key)
-                full_q = f"{SYSTEM_PROMPT}\n\nसंदर्भ: {live_context}\n\nसवाल: {prompt}"
-                contents = [full_q]
-                if uploaded_chart is not None:
-                    contents.append(types.Part.from_bytes(data=uploaded_chart.getvalue(), mime_type=uploaded_chart.type or "image/png"))
+                if chart_pil is not None:
+                    full_q = f"{SYSTEM_PROMPT}\n\nयूज़र ने एक चार्ट की फोटो भेजी है और पूछा है: {prompt}\nकृपया फोटो को ध्यान से देखकर विस्तार से बताएं।"
+                    contents = [full_q, chart_pil]
+                else:
+                    full_q = f"{SYSTEM_PROMPT}\n\nसंदर्भ: {live_context}\n\nसवाल: {prompt}"
+                    contents = [full_q]
                 
                 reply = None
                 err_msg = ""
-                for m in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]:
-                    try:
-                        res = client.models.generate_content(model=m, contents=contents)
-                        reply = res.text
+                for attempt in range(2):
+                    for m in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]:
+                        try:
+                            res = client.models.generate_content(model=m, contents=contents)
+                            reply = res.text
+                            break
+                        except Exception as e:
+                            err_msg = str(e)
+                    if reply:
                         break
-                    except Exception as e:
-                        err_msg = str(e)
+                    time.sleep(2)
                 if not reply:
-                    reply = f"❌ त्रुटि: {err_msg}"
+                    reply = f"❌ सर्वर अभी व्यस्त है, कृपया 10 सेकंड बाद फिर कोशिश करें। (विवरण: {err_msg})"
         
         st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
