@@ -80,10 +80,8 @@ if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। आप मुझसे कोई भी सवाल पूछ सकते हैं या ऊपर **चार्ट की फोटो** अपलोड करके उसका विश्लेषण करवा सकते हैं!"}
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे बॉक्स में अपना सवाल लिखें या चार्ट की फोटो अपलोड करें!"}
     ]
-
-tab1, tab2, tab3 = st.tabs(["💬 AI गुरु & चार्ट स्कैनर", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -112,6 +110,8 @@ try:
         live_context = f"शेयर: {selected_share} | ताज़ा भाव: ₹{curr_price} | बदलाव: ₹{diff} | ट्रेंड: {trend} | RSI(14): {rsi_val} | Support: ₹{support} | Resistance: ₹{resistance}"
 except Exception:
     pass
+
+tab1, tab2, tab3 = st.tabs(["💬 AI गुरु & चार्ट स्कैनर", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
 
 with tab2:
     if curr_price > 0:
@@ -201,7 +201,9 @@ with tab1:
         chart_img = Image.open(uploaded_chart)
         st.image(chart_img, caption="अपलोड किया गया चार्ट", width=300)
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
