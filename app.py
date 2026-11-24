@@ -24,7 +24,7 @@ with st.sidebar:
         st.success("✅ API Key सेव है!")
     else:
         api_key = st.text_input("अपनी Gemini API Key डालें:", type="password")
-    voice_on = st.checkbox("🔊 जवाब हिंदी में बोलकर सुनाएं (थोड़ा समय लेता है)", value=False)
+    voice_on = st.checkbox("🔊 जवाब हिंदी में बोलकर सुनाएं", value=False)
     if st.button("🗑️ चैट साफ करें"):
         st.session_state.messages = []
         st.rerun()
@@ -83,7 +83,7 @@ def get_stock_summary(ticker, share_name):
 
 ALL_SHARES = load_nifty_500()
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। अब मैं और भी तेज़ हूँ—नीचे सवाल लिखें या चार्ट अपलोड करें!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। नीचे सवाल लिखें या चार्ट की फोटो अपलोड करें!"}]
 
 selected_share = st.selectbox("🔍 शेयर चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -124,7 +124,7 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
         if not api_key:
             reply = "⚠️ कृपया पहले बाईं तरफ अपनी **Gemini API Key** डालें!"
         else:
-            with st.spinner("तेज़ी से विश्लेषण कर रहा हूँ..."):
+            with st.spinner("सोच रहा हूँ..."):
                 client = genai.Client(api_key=api_key)
                 if chart_pil is not None:
                     full_q = f"{SYSTEM_PROMPT}\n\nयूज़र ने चार्ट की फोटो भेजी है और पूछा है: {prompt}\nफोटो देखकर विस्तार से बताएं।"
@@ -135,16 +135,16 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
                 
                 reply = None
                 err_msg = ""
-                for m in ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash"]:
+                for m in ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-4-hydrogen", "gemini-3.8-flash"]:
                     try:
                         res = client.models.generate_content(model=m, contents=contents)
                         reply = res.text
                         break
                     except Exception as e:
                         err_msg = str(e)
-                        time.sleep(1)
+                        time.sleep(1.5)
                 if not reply:
-                    reply = f"❌ सर्वर अभी बहुत व्यस्त है, कृपया 5 सेकंड बाद फिर प्रयास करें। ({err_msg})"
+                    reply = f"❌ Google AI सर्वर अभी व्यस्त है, कृपया 5 सेकंड बाद फिर प्रयास करें। ({err_msg})"
         
         st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
