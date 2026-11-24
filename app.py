@@ -100,21 +100,21 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
             st.session_state.messages.append({"role": "assistant", "content": reply})
         else:
             with st.spinner("1000+ ट्रेडर्स के ज्ञान से सोच रहा हूँ..."):
-                try:
-                    client = genai.Client(api_key=api_key)
-                    full_prompt = f"{SYSTEM_PROMPT}\n\nलाइव मार्केट संदर्भ: {live_context}\n\nयूज़र का सवाल: {prompt}"
+                client = genai.Client(api_key=api_key.strip())
+                full_prompt = f"{SYSTEM_PROMPT}\n\nलाइव मार्केट संदर्भ: {live_context}\n\nयूज़र का सवाल: {prompt}"
+                reply = None
+                last_err = ""
+                for model_name in ["gemini-3.8-flash", "gemini-4-hydrogen", "gemini-3.5-flash-lite"]:
                     try:
                         response = client.models.generate_content(
-                            model="gemini-3.8-flash",
+                            model=model_name,
                             contents=full_prompt,
                         )
-                    except Exception:
-                        response = client.models.generate_content(
-                            model="gemini-2.5-flash",
-                            contents=full_prompt,
-                        )
-                    reply = response.text
-                except Exception as e:
-                    reply = f"❌ API Key जांचें या थोड़ी देर बाद कोशिश करें। (त्रुटि: {str(e)})"
+                        reply = response.text
+                        break
+                    except Exception as e:
+                        last_err = str(e)
+                if not reply:
+                    reply = f"❌ AI से जुड़ने में समस्या आई। कृपया अपनी API Key जांचें। (विवरण: {last_err})"
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
