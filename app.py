@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import requests
 import io
-from PIL import Image
 from gtts import gTTS
 from google import genai
 from google.genai import types
@@ -192,18 +191,18 @@ def text_to_speech_hindi(text):
         return None
 
 with tab1:
-    with st.form(key="ask_form"):
-        prompt = st.text_input("✍️ यहाँ अपना सवाल लिखें:", placeholder="जैसे: इस शेयर या चार्ट में क्या करें?")
-        uploaded_chart = st.file_uploader("📸 चार्ट की फोटो चुनें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
-        submit_btn = st.form_submit_button("🚀 AI को भेजें (जवाब पाएं)", use_container_width=True)
+    user_input = st.text_input("✍️ यहाँ अपना सवाल लिखें:", placeholder="जैसे: आज का मार्केट बताओ या इस शेयर में क्या करें?")
+    uploaded_chart = st.file_uploader("📸 चार्ट की फोटो चुनें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
+    ask_clicked = st.button("🚀 AI को भेजें (जवाब पाएं)", type="primary", use_container_width=True)
 
     SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
 
-    if submit_btn:
-        user_q = prompt.strip()
+    if ask_clicked:
+        user_q = user_input.strip()
         if not user_q and not uploaded_chart:
-            st.warning("⚠️ कृपया पहले सवाल लिखें या चार्ट की फोटो चुनें, फिर बटन दबाएं।")
+            st.warning("⚠️ कृपया पहले ऊपर अपना सवाल लिखें या चार्ट की फोटो चुनें, फिर बटन दबाएं।")
         else:
             if not user_q and uploaded_chart:
                 user_q = "इस अपलोड किए गए चार्ट की फोटो को देखकर पूरा विश्लेषण करें और बताएं कि ट्रेंड, सपोर्ट और रेजिस्टेंस क्या है।"
             
+            st.session_state.messages.append({"role": "user", "content": user_q})
