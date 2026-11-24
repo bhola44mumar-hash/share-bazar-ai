@@ -11,7 +11,6 @@ st.set_page_config(page_title="शेयर बाजार मस्तिष�
 
 st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
 
-# केवल सही AIzaSy वाली चाबी को ही स्वीकार करें
 saved_key = ""
 try:
     k = st.secrets["GEMINI_API_KEY"].strip()
@@ -26,7 +25,7 @@ with st.sidebar:
         api_key = saved_key
         st.success("✅ सही API Key सेव है!")
     else:
-        st.warning("⚠️ कृपया नीचे अपनी 'AIzaSy...' से शुरू होने वाली Gemini API Key डालें:")
+        st.warning("⚠️ कृपया नीचे अपनी 'AIzaSy...' वाली Gemini API Key डालें:")
         api_key = st.text_input("Gemini API Key:", type="password", placeholder="AIzaSy...")
     st.divider()
     st.header("🔊 आवाज़ सेटिंग")
@@ -207,7 +206,10 @@ submission = st.chat_input(
 
 if submission:
     user_text = submission.text.strip() if submission.text else ""
-    files_list = submission.files if submission.files else []
     img_bytes = None
     mime_type = "image/png"
-    if len(files_list) > 0:
+    for f in (submission.files or []):
+        img_bytes = f.getvalue()
+        mime_type = f.type or "image/png"
+        break
+
