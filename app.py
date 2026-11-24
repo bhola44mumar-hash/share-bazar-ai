@@ -27,7 +27,9 @@ with st.sidebar:
     st.divider()
     st.header("🔊 आवाज़ सेटिंग")
     voice_on = st.checkbox("AI के जवाब हिंदी में बोलकर सुनाएं", value=True)
-    st.info("यह सुपर-ऐप केवल शेयर बाजार, Intraday और F&O के लिए बना है।")
+    if st.button("🗑️ पुरानी चैट साफ करें"):
+        st.session_state.messages = []
+        st.rerun()
 
 @st.cache_data(ttl=120)
 def get_indices():
@@ -79,7 +81,9 @@ if "wallet" not in st.session_state:
 if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे दिए गए बॉक्स में सवाल लिखें या **फोटो आइकन (`+`)** दबाकर चार्ट की फोटो भेजें—मैं तुरंत जवाब दूँगा!"}
+    ]
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -109,9 +113,8 @@ try:
 except Exception:
     pass
 
-tab1, tab2, tab3 = st.tabs(["💬 AI गुरु से पूछें", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
-
-with tab2:
+# चार्ट और पेपर ट्रेडिंग को साफ-सुथरे Expander में रखा है ताकि चैट हमेशा सामने दिखे
+with st.expander("📊 लाइव चार्ट, RSI इंडिकेटर और टॉप शेयर स्कैनर देखें"):
     if curr_price > 0:
         c1, c2, c3 = st.columns(3)
         c1.metric("ताज़ा भाव", f"₹{curr_price}", f"{diff}")
@@ -119,10 +122,6 @@ with tab2:
         c3.metric("RSI (ताकत)", f"{rsi_val}", "Overbought >70 | Oversold <30")
         st.write(f"🛡️ **मजबूत Support:** ₹{support} &nbsp;|&nbsp; 🚧 **Resistance:** ₹{resistance}")
         st.line_chart(hist_data['Close'].tail(50))
-    else:
-        st.warning("डेटा लोड नहीं हो सका।")
-
-    st.divider()
     if st.button("🔎 आज के टॉप 8 शेयरों का तेज़ स्कैन करें"):
         with st.spinner("बाजार स्कैन हो रहा है..."):
             quick_list = ["SBIN.NS", "RELIANCE.NS", "HDFCBANK.NS", "INFY.NS", "TCS.NS", "TATAMOTORS.NS", "ICICIBANK.NS", "ITC.NS"]
@@ -141,9 +140,8 @@ with tab2:
             if scan_rows:
                 st.dataframe(pd.DataFrame(scan_rows), use_container_width=True)
 
-with tab3:
-    st.subheader("💼 वर्चुअल ट्रेडिंग खाता (प्रैक्टिस)")
-    st.metric("उपलब्ध बैलेंस", f"₹{round(st.session_state.wallet, 2)}")
+with st.expander("💰 पेपर ट्रेडिंग प्रैक्टिस (₹1,00,000 वर्चुअल बैलेंस)"):
+    st.metric("उपलब्ध प्रैक्टिस बैलेंस", f"₹{round(st.session_state.wallet, 2)}")
     if curr_price > 0:
         col_q, col_t, col_s = st.columns(3)
         qty = col_q.number_input("मात्रा:", min_value=1, max_value=1000, value=10)
@@ -190,19 +188,22 @@ def text_to_speech_hindi(text):
     except Exception:
         return None
 
-with tab1:
-    user_input = st.text_input("✍️ यहाँ अपना सवाल लिखें:", placeholder="जैसे: आज का मार्केट बताओ या इस शेयर में क्या करें?")
-    uploaded_chart = st.file_uploader("📸 चार्ट की फोटो चुनें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
-    ask_clicked = st.button("🚀 AI को भेजें (जवाब पाएं)", type="primary", use_container_width=True)
+# पुरानी बातचीत दिखाएं
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        if "image" in msg and msg["image"] is not None:
+            st.image(msg["image"], width=280)
+        st.markdown(msg["content"])
 
-    SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
+SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
 
-    if ask_clicked:
-        user_q = user_input.strip()
-        if not user_q and not uploaded_chart:
-            st.warning("⚠️ कृपया पहले ऊपर अपना सवाल लिखें या चार्ट की फोटो चुनें, फिर बटन दबाएं।")
-        else:
-            if not user_q and uploaded_chart:
-                user_q = "इस अपलोड किए गए चार्ट की फोटो को देखकर पूरा विश्लेषण करें और बताएं कि ट्रेंड, सपोर्ट और रेजिस्टेंस क्या है।"
-            
-            st.session_state.messages.append({"role": "user", "content": user_q})
+# बिल्कुल मेरे जैसा नीचे वाला चैट बार (लिखने + फोटो जोड़ने + भेजने की सुविधा एक साथ)
+submission = st.chat_input(
+    "यहाँ सवाल लिखें या बाईं तरफ (+) दबाकर चार्ट की फोटो भेजें...",
+    accept_file=True,
+    file_type=["png", "jpg", "jpeg"]
+)
+
+if submission:
+    user_text = submission.text.strip() if submission.text else ""
+    uploaded_files = submission.files if submission.files else []
