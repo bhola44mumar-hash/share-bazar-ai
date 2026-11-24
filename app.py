@@ -3,22 +3,65 @@ import yfinance as yf
 import pandas as pd
 import requests
 import io
+import base64
+from PIL import Image
+from gtts import gTTS
 from google import genai
 
-st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI", page_icon="📈", layout="centered")
+st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
 
+# हेडर
 st.markdown("""
-<div style="background-color:#1e3d59;padding:12px;border-radius:10px;text-align:center;">
-    <h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI</h2>
-    <p style="color:#d9e2ec;margin:4px 0 0 0;font-size:14px;">1000+ प्रोफेशनल ट्रेडर्स जैसा ज्ञान • Intraday & F&O विशेषज्ञ</p>
+<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:14px;border-radius:12px;text-align:center;">
+    <h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2>
+    <p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ प्रोफेशनल ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p>
 </div>
 """, unsafe_allow_html=True)
 
+# API Key जांचना
+saved_key = ""
+try:
+    saved_key = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    saved_key = ""
+
 with st.sidebar:
     st.header("🔑 AI सेटिंग्स")
-    api_key = st.text_input("अपनी Gemini API Key डालें:", type="password", placeholder="यहाँ अपनी Key पेस्ट करें...")
-    st.info("यह ऐप केवल शेयर बाजार, Intraday और F&O के सवालों का जवाब देता है।")
+    if saved_key:
+        api_key = saved_key
+        st.success("✅ API Key स्थायी रूप से सेव है!")
+    else:
+        api_key = st.text_input("अपनी Gemini API Key डालें:", type="password", placeholder="यहाँ अपनी Key पेस्ट करें...")
+    
+    st.divider()
+    st.header("🔊 आवाज़ सेटिंग")
+    voice_on = st.checkbox("AI के जवाब हिंदी में बोलकर सुनाएं", value=True)
+    st.info("यह सुपर-ऐप केवल शेयर बाजार, Intraday और F&O के लिए बना है।")
 
+# 1. Nifty 50 & Bank Nifty लाइव बार
+@st.cache_data(ttl=120)
+def get_indices():
+    res = {}
+    for name, sym in [("Nifty 50", "^NSEI"), ("Bank Nifty", "^NSEBANK"), ("India VIX", "^INDIAVIX")]:
+        try:
+            d = yf.Ticker(sym).history(period="2d")
+            if len(d) >= 2:
+                c = round(float(d['Close'].iloc[-1]), 2)
+                p = round(float(d['Close'].iloc[-2]), 2)
+                res[name] = (c, round(c - p, 2))
+            elif len(d) == 1:
+                res[name] = (round(float(d['Close'].iloc[-1]), 2), 0.0)
+        except Exception:
+            pass
+    return res
+
+indices = get_indices()
+if indices:
+    cols = st.columns(len(indices))
+    for i, (k, (val, chg)) in enumerate(indices.items()):
+        cols[i].metric(k, f"{val}", f"{chg}")
+
+# Nifty 500 लोड करना
 @st.cache_data(ttl=86400)
 def load_nifty_500():
     fallback = {
@@ -30,10 +73,10 @@ def load_nifty_500():
     }
     try:
         url = "https://nseindia.com"
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if res.status_code == 200:
-            df = pd.read_csv(io.StringIO(res.text))
-            shares = {f"{str(r['Company Name']).strip()} ({str(r['Symbol']).strip()})": f"{str(r['Symbol']).strip()}.NS" for _, r in df.iterrows()}
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if r.status_code == 200:
+            df = pd.read_csv(io.StringIO(r.text))
+            shares = {f"{str(row['Company Name']).strip()} ({str(row['Symbol']).strip()})": f"{str(row['Symbol']).strip()}.NS" for _, row in df.iterrows()}
             if len(shares) > 50:
                 return shares
     except Exception:
@@ -42,79 +85,149 @@ def load_nifty_500():
 
 ALL_SHARES = load_nifty_500()
 
-st.subheader("📊 लाइव शेयर स्कैनर (Top 500)")
-selected_share = st.selectbox("शेयर खोजें या चुनें (नाम टाइप करें):", sorted(list(ALL_SHARES.keys())))
+# पेपर ट्रेडिंग स्टेट
+if "wallet" not in st.session_state:
+    st.session_state.wallet = 100000.0
+if "positions" not in st.session_state:
+    st.session_state.positions = {}
 
+# टैब्स बनाना (ताकि मोबाइल स्क्रीन साफ रहे)
+tab1, tab2, tab3 = st.tabs(["💬 AI गुरु & चार्ट स्कैनर", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
+
+# शेयर चुनाव (सभी टैब्स के लिए)
+selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
+ticker = ALL_SHARES[selected_share]
+
+curr_price = 0.0
 live_context = ""
-if selected_share:
-    ticker = ALL_SHARES[selected_share]
-    try:
-        data = yf.Ticker(ticker).history(period="5d", interval="15m")
-        if not data.empty and len(data) >= 15:
-            curr_price = round(float(data['Close'].iloc[-1]), 2)
-            prev_close = round(float(data['Close'].iloc[-2]), 2)
-            diff = round(curr_price - prev_close, 2)
-            ma_fast = round(float(data['Close'].tail(5).mean()), 2)
-            ma_slow = round(float(data['Close'].tail(15).mean()), 2)
-            trend = "तेज़ी (Bullish)" if ma_fast > ma_slow else "कमजोरी (Bearish)"
+hist_data = pd.DataFrame()
+
+try:
+    hist_data = yf.Ticker(ticker).history(period="5d", interval="15m")
+    if not hist_data.empty and len(hist_data) >= 15:
+        curr_price = round(float(hist_data['Close'].iloc[-1]), 2)
+        prev_close = round(float(hist_data['Close'].iloc[-2]), 2)
+        diff = round(curr_price - prev_close, 2)
+        
+        # RSI गणना
+        delta = hist_data['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi_series = 100 - (100 / (1 + rs))
+        rsi_val = round(float(rsi_series.iloc[-1]), 1) if not pd.isna(rsi_series.iloc[-1]) else 50.0
+        
+        ma_fast = round(float(hist_data['Close'].tail(5).mean()), 2)
+        ma_slow = round(float(hist_data['Close'].tail(15).mean()), 2)
+        support = round(float(hist_data['Low'].tail(20).min()), 2)
+        resistance = round(float(hist_data['High'].tail(20).max()), 2)
+        trend = "तेज़ी (Bullish)" if ma_fast > ma_slow else "कमजोरी (Bearish)"
+        
+        live_context = (
+            f"शेयर: {selected_share} | ताज़ा भाव: ₹{curr_price} | बदलाव: ₹{diff} | "
+            f"ट्रेंड: {trend} | RSI(14): {rsi_val} | Support: ₹{support} | Resistance: ₹{resistance}"
+        )
+except Exception:
+    pass
+
+# ---------------- TAB 2: लाइव चार्ट & इंडिकेटर ----------------
+with tab2:
+    if curr_price > 0:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("ताज़ा भाव", f"₹{curr_price}", f"{diff}")
+        c2.metric("AI ट्रेंड", trend)
+        c3.metric("RSI (ताकत)", f"{rsi_val}", "Overbought >70 | Oversold <30")
+        
+        st.write(f"🛡️ **मजबूत Support (सहारा):** ₹{support} &nbsp;|&nbsp; 🚧 **Resistance (रुकावट):** ₹{resistance}")
+        st.line_chart(hist_data['Close'].tail(50))
+    else:
+        st.warning("डेटा लोड नहीं हो सका, कृपया इंटरनेट जांचें या दूसरा शेयर चुनें।")
+
+    st.divider()
+    if st.button("🔎 आज के टॉप 8 शेयरों का तेज़ स्कैन करें"):
+        with st.spinner("बाजार स्कैन हो रहा है..."):
+            quick_list = ["SBIN.NS", "RELIANCE.NS", "HDFCBANK.NS", "INFY.NS", "TCS.NS", "TATAMOTORS.NS", "ICICIBANK.NS", "ITC.NS"]
+            scan_rows = []
+            for sym in quick_list:
+                try:
+                    d = yf.Ticker(sym).history(period="2d", interval="15m")
+                    if len(d) >= 15:
+                        cp = round(float(d['Close'].iloc[-1]), 2)
+                        m5 = d['Close'].tail(5).mean()
+                        m15 = d['Close'].tail(15).mean()
+                        st_txt = "🟢 तेज़ी (Bullish)" if m5 > m15 else "🔴 कमजोरी (Bearish)"
+                        scan_rows.append({"शेयर": sym.replace(".NS", ""), "ताज़ा भाव (₹)": cp, "संकेत": st_txt})
+                except Exception:
+                    pass
+            if scan_rows:
+                st.dataframe(pd.DataFrame(scan_rows), use_container_width=True)
+
+# ---------------- TAB 3: पेपर ट्रेडिंग ----------------
+with tab3:
+    st.subheader("💼 आपका वर्चुअल ट्रेडिंग खाता (बिना असली पैसे के प्रैक्टिस)")
+    st.metric("उपलब्ध प्रैक्टिस बैलेंस", f"₹{round(st.session_state.wallet, 2)}")
+    
+    if curr_price > 0:
+        col_q, col_t, col_s = st.columns(3)
+        qty = col_q.number_input("मात्रा (Shares):", min_value=1, max_value=1000, value=10)
+        target_pts = col_t.number_input("Target मुनाफा (₹/शेयर):", min_value=1.0, value=5.0)
+        sl_pts = col_s.number_input("Stop-Loss नुकसान (₹/शेयर):", min_value=1.0, value=3.0)
+        
+        b1, b2 = st.columns(2)
+        if b1.button("🟢 खरीदें (Paper Buy)", use_container_width=True):
+            cost = curr_price * qty
+            if st.session_state.wallet >= cost:
+                st.session_state.wallet -= cost
+                st.session_state.positions[selected_share] = {
+                    "qty": qty, "buy_price": curr_price, "ticker": ticker,
+                    "target": curr_price + target_pts, "sl": curr_price - sl_pts
+                }
+                st.success(f"✅ {selected_share} के {qty} शेयर ₹{curr_price} पर खरीदे गए!")
+            else:
+                st.error("वर्चुअल बैलेंस कम है!")
+                
+        if selected_share in st.session_state.positions:
+            pos = st.session_state.positions[selected_share]
+            live_pnl = round((curr_price - pos["buy_price"]) * pos["qty"], 2)
+            st.info(f"📌 चलता हुआ सौदा: {pos['qty']} शेयर @ ₹{pos['buy_price']} | लाइव मुनाफा/नुकसान: **₹{live_pnl}** (Target: ₹{round(pos['target'],2)} | SL: ₹{round(pos['sl'],2)})")
             
-            c1, c2 = st.columns(2)
-            c1.metric(label="ताज़ा भाव", value=f"₹{curr_price}", delta=f"{diff}")
-            c2.metric(label="AI ट्रेंड संकेत", value=trend)
-            live_context = f"वर्तमान में यूज़र ने {selected_share} चुना है। इसका ताज़ा भाव ₹{curr_price} है, 5-कैंडल औसत ₹{ma_fast} और 15-कैंडल औसत ₹{ma_slow} है, और ट्रेंड '{trend}' है।"
+            # ऑटो Target / Stop-Loss चेक
+            if curr_price >= pos["target"]:
+                st.session_state.wallet += curr_price * pos["qty"]
+                del st.session_state.positions[selected_share]
+                st.balloons()
+                st.success(f"🎉 Target पूरा! ₹{live_pnl} मुनाफे पर अपने आप बिक गया!")
+            elif curr_price <= pos["sl"]:
+                st.session_state.wallet += curr_price * pos["qty"]
+                del st.session_state.positions[selected_share]
+                st.warning(f"🛑 Stop-Loss हिट! ₹{live_pnl} नुकसान पर सौदा अपने आप कट गया।")
+                
+            if b2.button("🔴 अभी बेचें (Paper Sell)", use_container_width=True):
+                st.session_state.wallet += curr_price * pos["qty"]
+                del st.session_state.positions[selected_share]
+                st.success(f"सौदा बंद किया गया। कुल मुनाफा/नुकसान: ₹{live_pnl}")
+
+# ---------------- TAB 1: AI गुरु & चार्ट स्कैनर ----------------
+def text_to_speech_hindi(text):
+    try:
+        clean_txt = text.replace("*", "").replace("#", "").replace("`", "")[:600]
+        tts = gTTS(text=clean_txt, lang='hi')
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return fp
     except Exception:
-        st.warning("ताज़ा डेटा लोड करने में थोड़ा समय लग रहा है।")
+        return None
 
-st.divider()
+with tab1:
+    if curr_price > 0:
+        st.caption(f"📡 लाइव संदर्भ: {live_context}")
+        
+    # चार्ट की फोटो अपलोड करने का विकल्प
+    uploaded_chart = st.file_uploader("📸 किसी भी चार्ट का स्क्रीनशॉट अपलोड करें (AI चार्ट पढ़कर बताएगा):", type=["png", "jpg", "jpeg"])
+    chart_img = None
+    if uploaded_chart:
+        chart_img = Image.open(uploaded_chart)
+        st.image(chart_img, caption="अपलोड किया गया चार्ट", width=300)
 
-st.subheader("💬 AI मार्केट गुरु से पूछें (हिंदी / Hinglish)")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। मुझसे Intraday, F&O, चार्ट या किसी भी शेयर के बारे में पूछें—चाहे आपकी स्पेलिंग थोड़ी गलत ही क्यों न हो, मैं समझ जाऊंगा!"}
-    ]
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-SYSTEM_PROMPT = """
-तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O (Futures & Options) के सर्वोच्च विशेषज्ञ।
-तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान (Price Action, Option Greeks, OI Data, Risk Management, Stop-Loss, Candlestick Patterns, Psychology) समाहित है।
-नियम:
-1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग (जैसे 'sbii ka bhaav', 'f&o kya h', 'intraday me loss se kaise bache') को भी पूरी तरह समझो और सरल, स्पष्ट हिंदी में जवाब दो।
-2. केवल शेयर बाजार, ट्रेडिंग, निवेश और वित्त से जुड़े सवालों का ही जवाब दो। यदि कोई फिल्म, राजनीति या बाहरी सवाल पूछे, तो विनम्रता से कहो कि तुम केवल शेयर बाजार के विशेषज्ञ हो।
-3. हर ट्रेडिंग सलाह के साथ छोटे Stop-Loss और Risk Management का महत्व जरूर समझाओ। कभी भी 100% गारंटीड मुनाफे का झूठा दावा मत करो।
-4. जवाब देने से पहले गहराई से सोचो (Think) और पॉइंट्स में आसान उदाहरण देकर समझाओ।
-"""
-
-if prompt := st.chat_input("यहाँ अपना सवाल लिखें... (जैसे: आज Intraday में कैसे ट्रेड करें?)"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        if not api_key:
-            reply = "⚠️ कृपया पहले बाईं तरफ (ऊपर `>` तीर दबाकर) अपनी **Gemini API Key** पेस्ट करें, तभी मेरा AI दिमाग काम करेगा!"
-            st.markdown(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-        else:
-            with st.spinner("1000+ ट्रेडर्स के ज्ञान से सोच रहा हूँ..."):
-                client = genai.Client(api_key=api_key.strip())
-                full_prompt = f"{SYSTEM_PROMPT}\n\nलाइव मार्केट संदर्भ: {live_context}\n\nयूज़र का सवाल: {prompt}"
-                reply = None
-                last_err = ""
-                for model_name in ["gemini-3.8-flash", "gemini-4-hydrogen", "gemini-3.5-flash-lite"]:
-                    try:
-                        response = client.models.generate_content(
-                            model=model_name,
-                            contents=full_prompt,
-                        )
-                        reply = response.text
-                        break
-                    except Exception as e:
-                        last_err = str(e)
-                if not reply:
-                    reply = f"❌ AI से जुड़ने में समस्या आई। कृपया अपनी API Key जांचें। (विवरण: {last_err})"
-                st.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
+    if "messages" not in st.session_state:
