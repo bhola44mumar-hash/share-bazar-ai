@@ -9,12 +9,7 @@ from google import genai
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
 
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:14px;border-radius:12px;text-align:center;">
-    <h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2>
-    <p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ प्रोफेशनल ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:14px;border-radius:12px;text-align:center;"><h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2><p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p></div>', unsafe_allow_html=True)
 
 saved_key = ""
 try:
@@ -210,8 +205,3 @@ with tab1:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    SYSTEM_PROMPT = """
-    तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ।
-    तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान समाहित है।
-    नियम:
-    1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो।
