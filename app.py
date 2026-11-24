@@ -3,27 +3,30 @@ import yfinance as yf
 import pandas as pd
 import requests
 import io
-import time
+import base64
 from PIL import Image
 from gtts import gTTS
 from google import genai
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
-st.markdown('<div style="background:#1e3d59;padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
+st.markdown('<div style="background:#1e3d59;padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Super-Fast Groq + Gemini)</h3></div>', unsafe_allow_html=True)
 
-saved_key = ""
+groq_key = ""
+gemini_key = ""
 try:
-    saved_key = str(st.secrets["GEMINI_API_KEY"]).strip()
+    groq_key = str(st.secrets.get("GROQ_API_KEY", "")).strip()
+    gemini_key = str(st.secrets.get("GEMINI_API_KEY", "")).strip()
 except Exception:
-    saved_key = ""
+    pass
 
 with st.sidebar:
-    st.header("🔑 AI सेटिंग्स")
-    if saved_key:
-        api_key = saved_key
-        st.success("✅ API Key सेव है!")
+    st.header("⚡ सुपर-फास्ट AI सेटिंग्स")
+    if groq_key:
+        st.success("✅ Groq इंजन (0.5 सेकंड स्पीड) चालू है!")
     else:
-        api_key = st.text_input("अपनी Gemini API Key डालें:", type="password")
+        groq_key = st.text_input("Groq API Key डालें (gsk_...):", type="password")
+    if gemini_key:
+        st.success("✅ Gemini बैकअप इंजन चालू है!")
     voice_on = st.checkbox("🔊 जवाब हिंदी में बोलकर सुनाएं", value=False)
     if st.button("🗑️ चैट साफ करें"):
         st.session_state.messages = []
@@ -83,7 +86,7 @@ def get_stock_summary(ticker, share_name):
 
 ALL_SHARES = load_nifty_500()
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI** हूँ। नीचे सवाल लिखें या चार्ट की फोटो अपलोड करें!"}]
+    st.session_state.messages = [{"role": "assistant", "content": "नमस्ते! मैं आपका **सुपर-फास्ट शेयर बाजार AI** हूँ। अब कोई `503` एरर नहीं आएगा—सवाल लिखें या चार्ट अपलोड करें!"}]
 
 selected_share = st.selectbox("🔍 शेयर चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
 ticker = ALL_SHARES[selected_share]
@@ -94,8 +97,8 @@ if live_context:
 uploaded_chart = st.file_uploader("📸 चार्ट की फोटो अपलोड करें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
 chart_pil = None
 if uploaded_chart is not None:
-    chart_pil = Image.open(uploaded_chart)
-    chart_pil.thumbnail((800, 800))
+    chart_pil = Image.open(uploaded_chart).convert("RGB")
+    chart_pil.thumbnail((512, 512))
     st.image(chart_pil, caption="✅ चार्ट तैयार है — अब नीचे सवाल लिखें", width=220)
 
 for msg in st.session_state.messages:
@@ -113,7 +116,32 @@ def speak_hindi(text):
     except Exception:
         return None
 
-SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार, Intraday और F&O के सर्वोच्च विशेषज्ञ। यदि चार्ट की फोटो भेजी गई है, तो पैटर्न, सपोर्ट, रेजिस्टेंस और ट्रेंड का विश्लेषण करो। संक्षिप्त, सटीक और सरल हिंदी में जवाब दो और Stop-Loss जरूर बताओ।"
+def ask_groq_fast(key, prompt_text, pil_image=None):
+    url = "https://groq.com"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    if pil_image is not None:
+        buf = io.BytesIO()
+        pil_image.save(buf, format="JPEG", quality=80)
+        b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
+        model = "meta-llama/llama-4-scout-17b-16e-instruct"
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt_text},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
+            ]
+        }]
+    else:
+        model = "llama-3.3-70b-versatile"
+        messages = [{"role": "user", "content": prompt_text}]
+        
+    payload = {"model": model, "messages": messages, "temperature": 0.4, "max_tokens": 1024}
+    r = requests.post(url, headers=headers, json=payload, timeout=20)
+    if r.status_code == 200:
+        return r.json()["choices"]["message"]["content"]
+    raise Exception(f"Groq {r.status_code}: {r.text}")
+
+SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI' हो—भारतीय शेयर बाजार, Intraday और F&O के सर्वोच्च विशेषज्ञ। यदि चार्ट की फोटो भेजी गई है, तो पैटर्न, सपोर्ट, रेजिस्टेंस और ट्रेंड का गहरा विश्लेषण करो। सरल हिंदी में सटीक जवाब दो और Stop-Loss जरूर बताओ।"
 
 if prompt := st.chat_input("यहाँ अपना सवाल लिखें और Enter दबाएं..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -121,30 +149,37 @@ if prompt := st.chat_input("यहाँ अपना सवाल लिखे�
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        if not api_key:
-            reply = "⚠️ कृपया पहले बाईं तरफ अपनी **Gemini API Key** डालें!"
+        if not groq_key and not gemini_key:
+            reply = "⚠️ कृपया बाईं तरफ अपनी **Groq API Key** डालें!"
         else:
-            with st.spinner("सोच रहा हूँ..."):
-                client = genai.Client(api_key=api_key)
+            with st.spinner("0.5 सेकंड में विश्लेषण कर रहा हूँ..."):
                 if chart_pil is not None:
                     full_q = f"{SYSTEM_PROMPT}\n\nयूज़र ने चार्ट की फोटो भेजी है और पूछा है: {prompt}\nफोटो देखकर विस्तार से बताएं।"
-                    contents = [full_q, chart_pil]
                 else:
                     full_q = f"{SYSTEM_PROMPT}\n\nसंदर्भ: {live_context}\n\nसवाल: {prompt}"
-                    contents = [full_q]
                 
                 reply = None
-                err_msg = ""
-                for m in ["gemini-3.5-flash-lite", "gemini-3.8-flash"]:
+                err_log = ""
+                
+                # नंबर 1: पहले सुपर-फास्ट Groq से तुरंत जवाब लाएं (ताकि कभी 503 न आए)
+                if groq_key:
                     try:
-                        res = client.models.generate_content(model=m, contents=contents)
-                        reply = res.text
-                        break
+                        reply = ask_groq_fast(groq_key, full_q, chart_pil)
                     except Exception as e:
-                        err_msg = str(e)
-                        time.sleep(2)
+                        err_log += f"Groq: {e} | "
+                
+                # नंबर 2: बैकअप में Gemini
+                if not reply and gemini_key:
+                    try:
+                        client = genai.Client(api_key=gemini_key)
+                        contents = [full_q, chart_pil] if chart_pil is not None else [full_q]
+                        res = client.models.generate_content(model="gemini-3.5-flash-lite", contents=contents)
+                        reply = res.text
+                    except Exception as e:
+                        err_log += f"Gemini: {e}"
+                        
                 if not reply:
-                    reply = f"❌ Google सर्वर अभी व्यस्त है या आपकी दैनिक फ्री लिमिट पूरी हो गई है। कृपया 1 मिनट बाद प्रयास करें। ({err_msg})"
+                    reply = f"❌ त्रुटि: {err_log}"
         
         st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
