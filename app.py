@@ -11,9 +11,12 @@ st.set_page_config(page_title="शेयर बाजार मस्तिष�
 
 st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:10px;border-radius:10px;text-align:center;"><h3 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h3></div>', unsafe_allow_html=True)
 
+# केवल सही AIzaSy वाली चाबी को ही स्वीकार करें
 saved_key = ""
 try:
-    saved_key = st.secrets["GEMINI_API_KEY"]
+    k = st.secrets["GEMINI_API_KEY"].strip()
+    if k.startswith("AIza"):
+        saved_key = k
 except Exception:
     saved_key = ""
 
@@ -21,9 +24,10 @@ with st.sidebar:
     st.header("🔑 AI सेटिंग्स")
     if saved_key:
         api_key = saved_key
-        st.success("✅ API Key स्थायी रूप से सेव है!")
+        st.success("✅ सही API Key सेव है!")
     else:
-        api_key = st.text_input("अपनी Gemini API Key डालें:", type="password", placeholder="यहाँ अपनी Key पेस्ट करें...")
+        st.warning("⚠️ कृपया नीचे अपनी 'AIzaSy...' से शुरू होने वाली Gemini API Key डालें:")
+        api_key = st.text_input("Gemini API Key:", type="password", placeholder="AIzaSy...")
     st.divider()
     st.header("🔊 आवाज़ सेटिंग")
     voice_on = st.checkbox("AI के जवाब हिंदी में बोलकर सुनाएं", value=True)
@@ -82,7 +86,7 @@ if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे दिए गए बॉक्स में सवाल लिखें या **फोटो आइकन (`+`)** दबाकर चार्ट की फोटो भेजें—मैं तुरंत जवाब दूँगा!"}
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे दिए गए चैट बार में सवाल लिखें या **(`+`) आइकन** दबाकर चार्ट की फोटो भेजें!"}
     ]
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
@@ -113,7 +117,6 @@ try:
 except Exception:
     pass
 
-# चार्ट और पेपर ट्रेडिंग को साफ-सुथरे Expander में रखा है ताकि चैट हमेशा सामने दिखे
 with st.expander("📊 लाइव चार्ट, RSI इंडिकेटर और टॉप शेयर स्कैनर देखें"):
     if curr_price > 0:
         c1, c2, c3 = st.columns(3)
@@ -188,7 +191,6 @@ def text_to_speech_hindi(text):
     except Exception:
         return None
 
-# पुरानी बातचीत दिखाएं
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         if "image" in msg and msg["image"] is not None:
@@ -197,7 +199,6 @@ for msg in st.session_state.messages:
 
 SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
 
-# बिल्कुल मेरे जैसा नीचे वाला चैट बार (लिखने + फोटो जोड़ने + भेजने की सुविधा एक साथ)
 submission = st.chat_input(
     "यहाँ सवाल लिखें या बाईं तरफ (+) दबाकर चार्ट की फोटो भेजें...",
     accept_file=True,
@@ -206,4 +207,7 @@ submission = st.chat_input(
 
 if submission:
     user_text = submission.text.strip() if submission.text else ""
-    uploaded_files = submission.files if submission.files else []
+    files_list = submission.files if submission.files else []
+    img_bytes = None
+    mime_type = "image/png"
+    if len(files_list) > 0:
