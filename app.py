@@ -84,7 +84,7 @@ if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। सबसे नीचे वाले बॉक्स में अपना सवाल लिखकर **Enter** दबाएं—मैं तुरंत जवाब दूँगा!"}
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे दिए गए बॉक्स में सवाल लिखें या **(`+`) आइकन** दबाकर चार्ट की फोटो भेजें!"}
     ]
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
@@ -178,11 +178,6 @@ with st.expander("💰 पेपर ट्रेडिंग प्रैक्�
                 del st.session_state.positions[selected_share]
                 st.success(f"सौदा बंद। कुल मुनाफा/नुकसान: ₹{live_pnl}")
 
-with st.expander("📸 चार्ट की फोटो अपलोड करें (फोटो चुनने के बाद नीचे सवाल लिखें)"):
-    uploaded_chart = st.file_uploader("यहाँ चार्ट का स्क्रीनशॉट चुनें:", type=["png", "jpg", "jpeg"])
-    if uploaded_chart:
-        st.image(uploaded_chart, caption="यह चार्ट AI को भेजा जाएगा", width=250)
-
 def text_to_speech_hindi(text):
     try:
         clean_txt = text.replace("*", "").replace("#", "").replace("`", "")[:600]
@@ -196,15 +191,27 @@ def text_to_speech_hindi(text):
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
+        if "image" in msg and msg["image"] is not None:
+            st.image(msg["image"], width=280)
         st.markdown(msg["content"])
 
 SYSTEM_PROMPT = "तुम 'शेयर बाजार मस्तिष्क AI (Pro)' हो—भारतीय शेयर बाजार (NSE/BSE), Equity, Intraday और F&O के सर्वोच्च विशेषज्ञ। तुम्हारे अंदर दुनिया के 1000+ प्रोफेशनल ट्रेडर्स का ज्ञान है। नियम: 1. यूज़र की टूटी-फूटी हिंदी, Hinglish या गलत स्पेलिंग को भी पूरी तरह समझो और सरल हिंदी में जवाब दो। 2. यदि चार्ट की फोटो भेजी गई है, तो उसमें दिख रहे ट्रेंड, सपोर्ट, रेजिस्टेंस और पैटर्न को समझाओ। 3. केवल शेयर बाजार और वित्त से जुड़े सवालों का ही जवाब दो। 4. हर सलाह के साथ Stop-Loss और Risk Management का महत्व जरूर समझाओ।"
 
-# बिल्कुल सादा और पक्का काम करने वाला चैट बॉक्स
-if prompt := st.chat_input("यहाँ अपना सवाल लिखें और Enter दबाएं..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+submission = st.chat_input(
+    "यहाँ सवाल लिखें या बाईं तरफ (+) दबाकर चार्ट की फोटो भेजें...",
+    accept_file=True,
+    file_type=["png", "jpg", "jpeg"]
+)
 
-    with st.chat_message("assistant"):
-        if not api_key:
+if not submission:
+    st.stop()
+
+user_text = submission.text.strip() if submission.text else ""
+img_bytes = None
+mime_type = "image/png"
+for f in (submission.files or []):
+    img_bytes = f.getvalue()
+    mime_type = f.type or "image/png"
+    break
+
+if not user_text and img_bytes:
