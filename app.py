@@ -214,4 +214,3 @@ for f in (submission.files or []):
     mime_type = f.type or "image/png"
     break
 
-if not user_text and img_bytes:
