@@ -9,7 +9,7 @@ from google import genai
 
 st.set_page_config(page_title="शेयर बाजार मस्तिष्क AI Pro", page_icon="🧠", layout="centered")
 
-st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:14px;border-radius:12px;text-align:center;"><h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2><p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #1e3d59, #2b5876);padding:12px;border-radius:12px;text-align:center;"><h2 style="color:white;margin:0;">🧠 शेयर बाजार मस्तिष्क AI (Pro)</h2><p style="color:#e0e6ed;margin:4px 0 0 0;font-size:13px;">1000+ ट्रेडर्स ज्ञान • लाइव चार्ट • पेपर ट्रेडिंग • चार्ट स्कैनर • हिंदी आवाज़</p></div>', unsafe_allow_html=True)
 
 saved_key = ""
 try:
@@ -80,7 +80,7 @@ if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे बॉक्स में अपना सवाल लिखें या चार्ट की फोटो अपलोड करें!"}
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। ऊपर बॉक्स में अपना सवाल लिखकर **'भेजें'** बटन दबाएं!"}
     ]
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
@@ -111,7 +111,7 @@ try:
 except Exception:
     pass
 
-tab1, tab2, tab3 = st.tabs(["💬 AI गुरु & चार्ट स्कैनर", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
+tab1, tab2, tab3 = st.tabs(["💬 AI गुरु से पूछें", "📊 लाइव चार्ट & इंडिकेटर", "💰 पेपर ट्रेडिंग (प्रैक्टिस)"])
 
 with tab2:
     if curr_price > 0:
@@ -195,15 +195,16 @@ def text_to_speech_hindi(text):
 with tab1:
     if curr_price > 0:
         st.caption(f"📡 लाइव संदर्भ: {live_context}")
-    uploaded_chart = st.file_uploader("📸 किसी भी चार्ट का स्क्रीनशॉट अपलोड करें (AI चार्ट पढ़कर बताएगा):", type=["png", "jpg", "jpeg"])
-    chart_img = None
-    if uploaded_chart:
-        chart_img = Image.open(uploaded_chart)
-        st.image(chart_img, caption="अपलोड किया गया चार्ट", width=300)
 
-    chat_container = st.container()
-    with chat_container:
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+    # बिल्कुल सामने दिखने वाला सवाल लिखने का फॉर्म
+    with st.form(key="ask_form", clear_on_submit=True):
+        prompt = st.text_input("✍️ यहाँ अपना सवाल लिखें (जैसे: इस शेयर में आज क्या करें?):", placeholder="यहाँ हिंदी या Hinglish में लिखें...")
+        submit_btn = st.form_submit_button("🚀 AI से पूछें")
+
+    with st.expander("📸 चार्ट की फोटो अपलोड करें (वैकल्पिक — यदि चार्ट दिखाना हो)"):
+        uploaded_chart = st.file_uploader("चार्ट का स्क्रीनशॉट चुनें:", type=["png", "jpg", "jpeg"])
+        chart_img = None
+        if uploaded_chart:
+            chart_img = Image.open(uploaded_chart)
+            st.image(chart_img, caption="अपलोड किया गया चार्ट", width=300)
 
