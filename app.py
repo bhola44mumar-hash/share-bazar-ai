@@ -80,7 +80,7 @@ if "positions" not in st.session_state:
     st.session_state.positions = {}
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। ऊपर बॉक्स में अपना सवाल लिखकर **'भेजें'** बटन दबाएं!"}
+        {"role": "assistant", "content": "नमस्ते! मैं आपका **शेयर बाजार मस्तिष्क AI (Pro)** हूँ। नीचे सवाल लिखें या चार्ट की फोटो डालकर **'🚀 AI को भेजें (जवाब पाएं)'** बटन दबाएं!"}
     ]
 
 selected_share = st.selectbox("🔍 शेयर खोजें या चुनें (Top 500):", sorted(list(ALL_SHARES.keys())))
@@ -196,15 +196,9 @@ with tab1:
     if curr_price > 0:
         st.caption(f"📡 लाइव संदर्भ: {live_context}")
 
-    # बिल्कुल सामने दिखने वाला सवाल लिखने का फॉर्म
-    with st.form(key="ask_form", clear_on_submit=True):
-        prompt = st.text_input("✍️ यहाँ अपना सवाल लिखें (जैसे: इस शेयर में आज क्या करें?):", placeholder="यहाँ हिंदी या Hinglish में लिखें...")
-        submit_btn = st.form_submit_button("🚀 AI से पूछें")
-
-    with st.expander("📸 चार्ट की फोटो अपलोड करें (वैकल्पिक — यदि चार्ट दिखाना हो)"):
-        uploaded_chart = st.file_uploader("चार्ट का स्क्रीनशॉट चुनें:", type=["png", "jpg", "jpeg"])
-        chart_img = None
-        if uploaded_chart:
-            chart_img = Image.open(uploaded_chart)
-            st.image(chart_img, caption="अपलोड किया गया चार्ट", width=300)
+    # सवाल और चार्ट फोटो दोनों एक ही बॉक्स में
+    with st.form(key="ask_form"):
+        prompt = st.text_input("✍️ यहाँ अपना सवाल लिखें:", placeholder="जैसे: इस शेयर या चार्ट में क्या करें?")
+        uploaded_chart = st.file_uploader("📸 चार्ट की फोटो चुनें (वैकल्पिक):", type=["png", "jpg", "jpeg"])
+        submit_btn = st.form_submit_button("🚀 AI को भेजें (जवाब पाएं)", use_container_width=True)
 
